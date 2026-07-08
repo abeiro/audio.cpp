@@ -19,6 +19,7 @@ set(ENGINE_DEFAULT_ENABLE_VULKAN OFF)
 set(ENGINE_DEFAULT_ENABLE_METAL OFF)
 set(ENGINE_DEFAULT_ENABLE_LLAMAFILE ON)
 set(ENGINE_DEFAULT_ENABLE_CUDA_GRAPHS ON)
+set(ENGINE_DEFAULT_ENABLE_NATIVE_CPU ON)
 if (APPLE)
     set(ENGINE_DEFAULT_ENABLE_METAL ON)
 endif()
@@ -43,6 +44,7 @@ option(ENGINE_ENABLE_VULKAN "Build ggml with Vulkan backend support" ${ENGINE_DE
 option(ENGINE_ENABLE_METAL "Build ggml with Metal backend support" ${ENGINE_DEFAULT_ENABLE_METAL})
 option(ENGINE_ENABLE_LLAMAFILE "Build ggml with llamafile SGEMM support" ${ENGINE_DEFAULT_ENABLE_LLAMAFILE})
 option(ENGINE_ENABLE_CUDA_GRAPHS "Enable ggml CUDA graphs support" ${ENGINE_DEFAULT_ENABLE_CUDA_GRAPHS})
+option(ENGINE_ENABLE_NATIVE_CPU "Build ggml CPU kernels with native host ISA flags" ${ENGINE_DEFAULT_ENABLE_NATIVE_CPU})
 option(ENGINE_ENABLE_OPENMP "Build host code with OpenMP support" ON)
 option(ENGINE_BUILD_EXAMPLES "Build example binaries" OFF)
 option(ENGINE_BUILD_TESTS "Build framework unit tests" OFF)
@@ -66,6 +68,7 @@ set(GGML_VULKAN ${ENGINE_ENABLE_VULKAN} CACHE BOOL "Build ggml with Vulkan backe
 set(GGML_METAL ${ENGINE_ENABLE_METAL} CACHE BOOL "Build ggml with Metal backend support" FORCE)
 set(GGML_LLAMAFILE ${ENGINE_ENABLE_LLAMAFILE} CACHE BOOL "Build ggml with llamafile SGEMM support" FORCE)
 set(GGML_CUDA_GRAPHS ${ENGINE_ENABLE_CUDA_GRAPHS} CACHE BOOL "Enable ggml CUDA graphs support" FORCE)
+set(GGML_NATIVE ${ENGINE_ENABLE_NATIVE_CPU} CACHE BOOL "Build ggml CPU kernels with native host ISA flags" FORCE)
 
 set(SPM_ENABLE_SHARED OFF CACHE BOOL "Build sentencepiece shared libs" FORCE)
 set(SPM_BUILD_TEST OFF CACHE BOOL "Do not build sentencepiece tests" FORCE)
@@ -85,6 +88,7 @@ add_compile_options(
 add_library(engine_runtime STATIC
     src/framework/assets/resource_bundle.cpp
     src/framework/assets/tensor_source.cpp
+    src/framework/assets/torch_bin.cpp
     src/framework/core/module.cpp
     src/framework/core/backend.cpp
     src/framework/core/deferred_tensor_writer.cpp
@@ -106,6 +110,7 @@ add_library(engine_runtime STATIC
     src/framework/io/json.cpp
     src/framework/io/text.cpp
     src/framework/text/chunking.cpp
+    src/framework/text/subtitle.cpp
     src/framework/io/yaml.cpp
     src/framework/io/binary.cpp
     src/framework/io/safetensors.cpp
@@ -145,6 +150,8 @@ add_library(engine_runtime STATIC
     src/framework/modules/conformer_modules.cpp
     src/framework/modules/predictor_modules.cpp
     src/framework/modules/positional_modules.cpp
+    src/framework/modules/text_encoders/t5_base_encoder.cpp
+    src/framework/modules/text_encoders/t5_gemma_encoder.cpp
     src/framework/modules/optimizations/fast_kv_modules.cpp
     src/framework/tokenizers/hf_tokenizer_json.cpp
     src/framework/tokenizers/llama_bpe.cpp
@@ -154,6 +161,7 @@ add_library(engine_runtime STATIC
     src/framework/tokenizers/sentencepiece.cpp
     src/framework/audio/fft.cpp
     src/framework/audio/activity.cpp
+    src/framework/audio/chunking.cpp
     src/framework/audio/conversion.cpp
     src/framework/audio/deepfilternet2.cpp
     src/framework/audio/dsp.cpp
@@ -175,6 +183,14 @@ add_library(engine_runtime STATIC
     src/framework/sampling/diffusion_math.cpp
     src/framework/sampling/noise.cpp
     src/framework/sampling/torch_random.cpp
+    src/models/roformer/assets.cpp
+    src/models/roformer/runtime.cpp
+    src/models/roformer/session.cpp
+    src/models/demucs/assets.cpp
+    src/models/demucs/frontend.cpp
+    src/models/demucs/pipeline.cpp
+    src/models/demucs/postprocess.cpp
+    src/models/demucs/session.cpp
     src/models/omnivoice/assets.cpp
     src/models/omnivoice/tokenizer_text.cpp
     src/models/omnivoice/audio_tokenizer.cpp
@@ -219,10 +235,18 @@ add_library(engine_runtime STATIC
     src/models/vibevoice/diffusion_sampler.cpp
     src/models/vibevoice/generator.cpp
     src/models/vibevoice/loader.cpp
+    src/models/vibevoice/lora.cpp
     src/models/vibevoice/scheduler.cpp
     src/models/vibevoice/session.cpp
     src/models/vibevoice/tokenizer_audio.cpp
     src/models/vibevoice/tokenizer_text.cpp
+    src/models/heartmula/assets.cpp
+    src/models/heartmula/codec.cpp
+    src/models/heartmula/generator.cpp
+    src/models/heartmula/loader.cpp
+    src/models/heartmula/mula.cpp
+    src/models/heartmula/session.cpp
+    src/models/heartmula/tokenizer_text.cpp
     src/models/qwen3_tts/assets.cpp
     src/models/qwen3_tts/tokenizer_text.cpp
     src/models/qwen3_tts/tokenizer_speech_encoder.cpp
@@ -284,6 +308,39 @@ add_library(engine_runtime STATIC
     src/models/qwen3_forced_aligner/processor.cpp
     src/models/qwen3_forced_aligner/session.cpp
     src/models/qwen3_forced_aligner/loader.cpp
+    src/models/ace_step/assets.cpp
+    src/models/ace_step/audio_preprocess.cpp
+    src/models/ace_step/condition_encoder.cpp
+    src/models/ace_step/cover_tokenizer.cpp
+    src/models/ace_step/detokenizer.cpp
+    src/models/ace_step/diffusion.cpp
+    src/models/ace_step/dit_weights_runtime.cpp
+    src/models/ace_step/loader.cpp
+    src/models/ace_step/planner.cpp
+    src/models/ace_step/pre_dit.cpp
+    src/models/ace_step/prompt_builder.cpp
+    src/models/ace_step/repaint.cpp
+    src/models/ace_step/request_parser.cpp
+    src/models/ace_step/session.cpp
+    src/models/ace_step/task_route.cpp
+    src/models/ace_step/text_encoder.cpp
+    src/models/ace_step/tokenizer_text.cpp
+    src/models/ace_step/vae_decoder.cpp
+    src/models/ace_step/vae_encoder.cpp
+    src/models/stable_audio/assets.cpp
+    src/models/stable_audio/conditioner.cpp
+    src/models/stable_audio/conditioner_runtime.cpp
+    src/models/stable_audio/foundation/conditioner.cpp
+    src/models/stable_audio/foundation/oobleck_autoencoder.cpp
+    src/models/stable_audio/foundation/rf_dit.cpp
+    src/models/stable_audio/foundation/session.cpp
+    src/models/stable_audio/loader.cpp
+    src/models/stable_audio/request.cpp
+    src/models/stable_audio/rf_dit.cpp
+    src/models/stable_audio/same_autoencoder.cpp
+    src/models/stable_audio/sampler.cpp
+    src/models/stable_audio/session.cpp
+    src/models/stable_audio/t5gemma.cpp
     src/models/sortformer_diar/assets.cpp
     src/models/sortformer_diar/frontend.cpp
     src/models/sortformer_diar/graph.cpp
@@ -349,8 +406,12 @@ endif()
 if (ENGINE_ENABLE_CUDA)
     target_sources(engine_runtime PRIVATE
         src/framework/audio/istft_cuda_runtime.cu
+        src/framework/sampling/torch_random_cuda_runtime.cu
     )
-    set_source_files_properties(src/framework/audio/istft_cuda_runtime.cu PROPERTIES
+    set_source_files_properties(
+        src/framework/audio/istft_cuda_runtime.cu
+        src/framework/sampling/torch_random_cuda_runtime.cu
+        PROPERTIES
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
     )
@@ -359,7 +420,7 @@ if (ENGINE_ENABLE_CUDA)
     else()
         set_target_properties(engine_runtime PROPERTIES CUDA_ARCHITECTURES native)
     endif()
-    target_compile_definitions(engine_runtime PUBLIC ENGINE_HAS_CUDA_ISTFT=1)
+    target_compile_definitions(engine_runtime PUBLIC ENGINE_HAS_CUDA_ISTFT=1 ENGINE_HAS_CUDA_TORCH_RANDOM=1)
     target_link_libraries(engine_runtime PRIVATE CUDA::cudart CUDA::cufft)
 endif()
 
@@ -383,6 +444,7 @@ add_executable(audiocpp_server
     app/server/main.cpp
     app/server/config.cpp
     app/server/http.cpp
+    app/server/multipart.cpp
     app/server/runtime.cpp
     app/cli/args.cpp
     app/cli/request.cpp
@@ -412,6 +474,24 @@ add_executable(miocodec_wavlm_parity
 )
 
 target_link_libraries(miocodec_wavlm_parity PRIVATE engine_runtime ggml)
+
+add_executable(torch_bin_parity
+    tests/vibevoice/torch_bin_parity.cpp
+)
+
+target_link_libraries(torch_bin_parity PRIVATE engine_runtime ggml)
+if (ENGINE_ENABLE_OPENMP)
+    target_link_libraries(torch_bin_parity PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+add_executable(vibevoice_finetune_overlay_check
+    tests/vibevoice/finetune_overlay_check.cpp
+)
+
+target_link_libraries(vibevoice_finetune_overlay_check PRIVATE engine_runtime ggml)
+if (ENGINE_ENABLE_OPENMP)
+    target_link_libraries(vibevoice_finetune_overlay_check PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 if (ENGINE_BUILD_WARMBENCH)
     function(add_engine_warmbench target_name source_file)
@@ -469,6 +549,20 @@ if (ENGINE_BUILD_TESTS)
     add_test(
         NAME audio_dsp_test
         COMMAND audio_dsp_test
+    )
+
+    add_engine_unittest(audio_chunking_test tests/unittests/test_audio_chunking.cpp)
+
+    add_test(
+        NAME audio_chunking_test
+        COMMAND audio_chunking_test
+    )
+
+    add_engine_unittest(subtitle_formatter_test tests/unittests/test_subtitle_formatter.cpp)
+
+    add_test(
+        NAME subtitle_formatter_test
+        COMMAND subtitle_formatter_test
     )
 
     add_engine_unittest(rnnoise_utility_test tests/unittests/test_rnnoise_utility.cpp)
@@ -533,6 +627,41 @@ if (ENGINE_BUILD_TESTS)
     add_test(
         NAME encoder_module_test
         COMMAND encoder_module_test
+    )
+
+    add_engine_unittest(conv_transpose_fast_path_test tests/unittests/test_conv_transpose_fast_path.cpp)
+
+    add_test(
+        NAME conv_transpose_fast_path_test
+        COMMAND conv_transpose_fast_path_test
+    )
+
+    add_executable(server_multipart_test
+        tests/unittests/test_server_multipart.cpp
+        app/server/multipart.cpp
+    )
+    target_include_directories(server_multipart_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/app/server)
+
+    add_test(
+        NAME server_multipart_test
+        COMMAND server_multipart_test
+    )
+
+    add_executable(server_config_test
+        tests/unittests/test_server_config.cpp
+        app/server/config.cpp
+        app/cli/args.cpp
+        app/cli/request.cpp
+    )
+    target_include_directories(server_config_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/app/server)
+    target_link_libraries(server_config_test PRIVATE engine_runtime ggml)
+    if (ENGINE_ENABLE_OPENMP)
+        target_link_libraries(server_config_test PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+
+    add_test(
+        NAME server_config_test
+        COMMAND server_config_test
     )
 endif()
 

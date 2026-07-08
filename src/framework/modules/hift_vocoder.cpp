@@ -559,15 +559,26 @@ public:
         output_ = build_f0_graph(ctx_, weights, input_);
         graph_ = ggml_new_graph_custom(ctx_, 32768, false);
         ggml_build_forward_expand(graph_, output_);
-        buffer_ = ggml_backend_alloc_ctx_tensors(ctx_, weights.execution_context->backend());
-        if (buffer_ == nullptr) {
+        gallocr_ = ggml_gallocr_new(ggml_backend_get_default_buffer_type(weights.execution_context->backend()));
+        if (gallocr_ == nullptr ||
+            !ggml_gallocr_reserve(gallocr_, graph_) ||
+            !ggml_gallocr_alloc_graph(gallocr_, graph_)) {
+            if (gallocr_ != nullptr) {
+                ggml_gallocr_free(gallocr_);
+                gallocr_ = nullptr;
+            }
+            ggml_free(ctx_);
+            ctx_ = nullptr;
             throw std::runtime_error("failed to allocate HiFT F0 graph");
         }
     }
 
     ~F0Runner() {
-        if (buffer_ != nullptr) {
-            ggml_backend_buffer_free(buffer_);
+        if (weights_ != nullptr && graph_ != nullptr) {
+            engine::core::release_backend_graph_resources(weights_->execution_context->backend(), graph_);
+        }
+        if (gallocr_ != nullptr) {
+            ggml_gallocr_free(gallocr_);
         }
         if (ctx_ != nullptr) {
             ggml_free(ctx_);
@@ -598,7 +609,7 @@ private:
     const HiftVocoderWeights * weights_ = nullptr;
     int64_t capacity_frames_ = 0;
     ggml_context * ctx_ = nullptr;
-    ggml_backend_buffer_t buffer_ = nullptr;
+    ggml_gallocr_t gallocr_ = nullptr;
     ggml_cgraph * graph_ = nullptr;
     ggml_tensor * input_ = nullptr;
     ggml_tensor * output_ = nullptr;
@@ -628,15 +639,26 @@ public:
             weights.execution_context->uses_host_graph_plan());
         graph_ = ggml_new_graph_custom(ctx_, 65536, false);
         ggml_build_forward_expand(graph_, post_);
-        buffer_ = ggml_backend_alloc_ctx_tensors(ctx_, weights.execution_context->backend());
-        if (buffer_ == nullptr) {
+        gallocr_ = ggml_gallocr_new(ggml_backend_get_default_buffer_type(weights.execution_context->backend()));
+        if (gallocr_ == nullptr ||
+            !ggml_gallocr_reserve(gallocr_, graph_) ||
+            !ggml_gallocr_alloc_graph(gallocr_, graph_)) {
+            if (gallocr_ != nullptr) {
+                ggml_gallocr_free(gallocr_);
+                gallocr_ = nullptr;
+            }
+            ggml_free(ctx_);
+            ctx_ = nullptr;
             throw std::runtime_error("failed to allocate HiFT backend graph");
         }
     }
 
     ~BackendRunner() {
-        if (buffer_ != nullptr) {
-            ggml_backend_buffer_free(buffer_);
+        if (weights_ != nullptr && graph_ != nullptr) {
+            engine::core::release_backend_graph_resources(weights_->execution_context->backend(), graph_);
+        }
+        if (gallocr_ != nullptr) {
+            ggml_gallocr_free(gallocr_);
         }
         if (ctx_ != nullptr) {
             ggml_free(ctx_);
@@ -668,7 +690,7 @@ private:
     int64_t capacity_frames_ = 0;
     int64_t capacity_stft_frames_ = 0;
     ggml_context * ctx_ = nullptr;
-    ggml_backend_buffer_t buffer_ = nullptr;
+    ggml_gallocr_t gallocr_ = nullptr;
     ggml_cgraph * graph_ = nullptr;
     ggml_tensor * speech_in_ = nullptr;
     ggml_tensor * source_in_ = nullptr;
@@ -712,6 +734,12 @@ public:
         out.samples = static_cast<int64_t>(out.waveform.size());
         out.sample_rate = weights_->config.sampling_rate;
         return out;
+    }
+
+    void release_runtime_cache() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        f0_runner_.reset();
+        backend_runner_.reset();
     }
 
 private:
@@ -954,6 +982,13 @@ std::vector<float> HiftVocoderComponent::predict_f0(const std::vector<float> & m
         throw std::runtime_error("HiFT component is not initialized");
     }
     return state_->runner->predict_f0(mel, frames);
+}
+
+void HiftVocoderComponent::release_runtime_cache() const {
+    if (state_ == nullptr || state_->runner == nullptr) {
+        throw std::runtime_error("HiFT component is not initialized");
+    }
+    state_->runner->release_runtime_cache();
 }
 
 }  // namespace engine::modules
