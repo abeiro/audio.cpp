@@ -12,6 +12,84 @@ struct ggml_cgraph;
 
 namespace engine::modules {
 
+enum class QwenDecoderAttentionMode {
+    ManualRepeat,
+    FlashGrouped,
+    FlashGroupedViewKV,
+    ManualRepeatThenGroupedQuery,
+};
+
+enum class QwenDecoderStaticCacheUpdateMode {
+    ScratchTail,
+    DirectSetRows,
+};
+
+enum class QwenDecoderStaticCacheSetRowsMode {
+    Exact,
+    BackendViewOptimized,
+};
+
+enum class QwenDecoderQKVLayout {
+    Separate,
+    PackedQKV,
+};
+
+enum class QwenDecoderMLPMode {
+    Exact,
+    FusedSwiGLU,
+    PackedGateUp,
+};
+
+enum class QwenDecoderPrefixAttentionMode {
+    Exact,
+    FlashWithPrefix,
+};
+
+enum class QwenDecoderPositionEncoding {
+    Rotary,
+    None,
+};
+
+struct QwenDecoderActivationCastPolicy {
+    bool enabled = false;
+    ggml_type type = GGML_TYPE_BF16;
+    bool after_input_norm = false;
+    bool after_qkv_projection = false;
+    bool after_qk_norm = false;
+    bool after_rope = false;
+    bool after_static_cache_update = false;
+    bool after_attention = false;
+    bool after_attention_output = false;
+    bool after_residual = false;
+    bool after_ffn_norm = false;
+    bool after_mlp_projection = false;
+    bool after_mlp_silu = false;
+    bool after_mlp_mul = false;
+    bool after_output = false;
+};
+
+struct QwenDecoderAttentionPolicy {
+    QwenDecoderAttentionMode prefill_mode = QwenDecoderAttentionMode::ManualRepeat;
+    QwenDecoderAttentionMode static_mode = QwenDecoderAttentionMode::FlashGrouped;
+    QwenDecoderPrefixAttentionMode prefix_mode = QwenDecoderPrefixAttentionMode::Exact;
+    int64_t grouped_query_min_steps = 0;
+};
+
+struct QwenDecoderStaticCachePolicy {
+    QwenDecoderStaticCacheUpdateMode update_mode = QwenDecoderStaticCacheUpdateMode::ScratchTail;
+    QwenDecoderStaticCacheSetRowsMode set_rows_mode = QwenDecoderStaticCacheSetRowsMode::Exact;
+};
+
+struct QwenDecoderMLPPolicy {
+    QwenDecoderMLPMode mode = QwenDecoderMLPMode::Exact;
+};
+
+struct QwenDecoderRuntimePolicy {
+    QwenDecoderAttentionPolicy attention;
+    QwenDecoderStaticCachePolicy static_cache;
+    QwenDecoderMLPPolicy mlp;
+};
+
 struct QwenDecoderLayerConfig {
     int64_t hidden_size = 0;
     int64_t num_attention_heads = 0;
@@ -20,13 +98,20 @@ struct QwenDecoderLayerConfig {
     int64_t intermediate_size = 0;
     float rms_norm_eps = 1e-5f;
     float rope_theta = 10000.0f;
+    int rope_type = GGML_ROPE_TYPE_NEOX;
+    QwenDecoderPositionEncoding position_encoding = QwenDecoderPositionEncoding::Rotary;
     ggml_prec attention_precision = GGML_PREC_F32;
     ggml_prec projection_precision = GGML_PREC_DEFAULT;
+    QwenDecoderQKVLayout qkv_layout = QwenDecoderQKVLayout::Separate;
+    bool use_qk_norm = true;
+    QwenDecoderActivationCastPolicy activation_cast;
+    QwenDecoderRuntimePolicy runtime;
 };
 
 struct QwenMLPWeights {
     LinearWeights gate_proj;
     LinearWeights up_proj;
+    std::optional<LinearWeights> gate_up_proj;
     LinearWeights down_proj;
 };
 
@@ -37,6 +122,9 @@ struct QwenDecoderLayerWeights {
     NormWeights k_norm;
     NormWeights post_norm;
     QwenMLPWeights mlp;
+    // Optional per-frequency RoPE divisors (head_dim / 2), used by Llama-3
+    // scaling and compatible checkpoints.
+    std::optional<core::TensorValue> rope_frequency_factors;
 };
 
 struct QwenDecoderLayerOutputs {
@@ -69,6 +157,7 @@ public:
         const QwenDecoderLayerWeights & weights,
         const core::TensorValue & cache_key,
         const core::TensorValue & cache_value,
+        const std::optional<core::TensorValue> & cache_slot,
         const core::TensorValue & attention_mask) const;
 
     static const core::ModuleSchema & static_schema() noexcept;
@@ -86,9 +175,17 @@ struct QwenDecoderStackConfig {
     int64_t layers = 0;
     float rms_norm_eps = 1e-5f;
     float rope_theta = 10000.0f;
+    int rope_type = GGML_ROPE_TYPE_NEOX;
+    QwenDecoderPositionEncoding position_encoding = QwenDecoderPositionEncoding::Rotary;
     ggml_prec attention_precision = GGML_PREC_F32;
     ggml_prec projection_precision = GGML_PREC_DEFAULT;
+    QwenDecoderQKVLayout qkv_layout = QwenDecoderQKVLayout::Separate;
+    bool use_qk_norm = true;
+    QwenDecoderActivationCastPolicy activation_cast;
+    QwenDecoderRuntimePolicy runtime;
 };
+
+QwenDecoderLayerConfig qwen_decoder_layer_config_from_stack(const QwenDecoderStackConfig & config);
 
 struct QwenDecoderStackWeights {
     std::vector<QwenDecoderLayerWeights> layers;

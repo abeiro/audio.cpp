@@ -5,11 +5,13 @@ on:
     branches:
       - ci/**
       - main
-      - release-0.1
+      - dev
+      - release-0.2
   pull_request:
     branches:
       - main
-      - release-0.1
+      - dev
+      - release-0.2
   workflow_dispatch:
 
 jobs:
@@ -35,6 +37,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check loader/catalog sync
+        run: |
+          python3 tools/check_loader_catalog_sync.py --self-test
+          python3 tools/check_loader_catalog_sync.py
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -49,4 +56,4 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build "$BUILD_DIR" --parallel "$(nproc)" --target audiocpp_cli audiocpp_server
+          cmake --build "$BUILD_DIR" --parallel "$(nproc)" --target audiocpp_cli audiocpp_server audiocpp_gguf

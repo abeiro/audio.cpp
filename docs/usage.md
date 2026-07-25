@@ -11,7 +11,7 @@ audiocpp_cli --task <task> --family <family> --model <model-dir> --backend <back
 | Option | Values | Default | Meaning |
 |---|---|---:|---|
 | `--task` | `gen`, `tts`, `clon`, `vc`, `svc`, `s2s`, `asr`, `align`, `vad`, `diar`, `sep`, `vdes` | required | User task. |
-| `--family` | model family name | required | Selects the model implementation. |
+| `--family` | model family name | required | Selects the model implementation. Must match a registered loader (`audiocpp_cli --list-loaders`). |
 | `--model` | local model directory | required | Path to local model assets. |
 | `--backend` | `cpu`, `cuda`, `vulkan`, `metal`, `best` | `cpu` | Inference backend. |
 | `--mode` | `offline`, `streaming` | `offline` | Run mode. Most models are offline. |
@@ -54,6 +54,7 @@ Omit these unless you need explicit control. If `--seed` is omitted, models that
 | `--guidance-scale` | float | Classifier-free guidance scale. |
 | `--num-inference-steps` | integer | Diffusion/flow denoising steps. |
 | `--text-chunk-size` | integer chars | Split long text where supported, including TTS text. |
+| `--text-chunk-mode` | `default`, `tag_aware`, `japanese`, `endline` | Select text chunking mode where supported. |
 
 ## Batch Inputs
 
@@ -74,11 +75,6 @@ Omit these unless you need explicit control. If `--seed` is omitted, models that
 |---|---|
 | Speech, voice clone, long-form TTS | [tts.md](tts.md) |
 | Music and sound generation | [music_generation.md](music_generation.md) |
-| ACE-Step music generation/editing | [ace_step.md](ace_step.md) |
-| Stable Audio music/SFX generation | [stable_audio.md](stable_audio.md) |
-| VeVo2 speech/singing conversion routes | [vevo2.md](vevo2.md) |
-| Seed-VC voice conversion and SVC | [seed_vc.md](seed_vc.md) |
-| Qwen3 TTS, ASR, forced alignment | [qwen3.md](qwen3.md) |
-| ASR, VAD, diarization | [speech_analysis.md](speech_analysis.md) |
+| ASR models | [asr.md](asr.md) |
+| VAD and diarization | [speech_analysis.md](speech_analysis.md) |
 | Voice conversion codec and source separation | [audio_tools.md](audio_tools.md) |
-| Framework module optimization notes | [module_optimizations.md](module_optimizations.md) |

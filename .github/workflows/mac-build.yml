@@ -5,11 +5,13 @@ on:
     branches:
       - ci/**
       - main
-      - release-0.1
+      - dev
+      - release-0.2
   pull_request:
     branches:
       - main
-      - release-0.1
+      - dev
+      - release-0.2
   workflow_dispatch:
 
 jobs:
@@ -23,6 +25,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check loader/catalog sync
+        run: |
+          python3 tools/check_loader_catalog_sync.py --self-test
+          python3 tools/check_loader_catalog_sync.py
 
       - name: Configure
         run: |
@@ -38,4 +45,4 @@ jobs:
         run: |
           cmake --build "$BUILD_DIR" \
             --parallel "$(sysctl -n hw.logicalcpu)" \
-            --target audiocpp_cli audiocpp_server
+            --target audiocpp_cli audiocpp_server audiocpp_gguf

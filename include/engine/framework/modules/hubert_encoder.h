@@ -12,6 +12,10 @@
 #include <unordered_map>
 #include <vector>
 
+namespace engine::assets {
+class TensorSource;
+}
+
 namespace engine::modules {
 
 struct HubertEncoderConfig {
@@ -54,6 +58,10 @@ public:
         const std::filesystem::path & checkpoint_path,
         core::BackendConfig backend,
         HubertEncoderConfig config = {});
+    static HubertEncoderComponent load_from_tensor_source(
+        std::shared_ptr<const assets::TensorSource> source,
+        core::BackendConfig backend,
+        HubertEncoderConfig config = {});
 
     HubertEncoderComponent() = default;
     HubertEncoderComponent(
@@ -69,6 +77,7 @@ public:
         const std::vector<float> & input_values,
         int64_t batch,
         int64_t samples) const;
+    void release_runtime_graph();
 
 private:
     struct State;

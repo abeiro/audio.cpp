@@ -1,15 +1,14 @@
 #include "engine/models/vibevoice/assets.h"
 
 #include "engine/framework/assets/resource_bundle.h"
+#include "engine/framework/io/config.h"
 #include "engine/framework/io/filesystem.h"
 #include "engine/framework/io/json.h"
 
 #include <algorithm>
 #include <cstring>
-#include <set>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 namespace engine::models::vibevoice {
@@ -38,18 +37,6 @@ assets::ResourceBundle make_resource_bundle(const std::filesystem::path & model_
         {"tokenizer_merges", "merges.txt", false},
     });
     return resources;
-}
-
-void require_positive(int64_t value, const char * label) {
-    if (value <= 0) {
-        throw std::runtime_error(std::string("VibeVoice config contains non-positive ") + label);
-    }
-}
-
-void require_divisible(int64_t value, int64_t divisor, const char * label) {
-    if (divisor <= 0 || value % divisor != 0) {
-        throw std::runtime_error(std::string("VibeVoice config invalid divisibility for ") + label);
-    }
 }
 
 void require_string_value(const std::string & actual, const char * expected, const char * label) {
@@ -84,10 +71,10 @@ VibeVoiceTokenizerConfig parse_tokenizer_config(const engine::io::json::Value & 
     config.decoder_n_filters = json::optional_i64(value, "decoder_n_filters", config.encoder_n_filters);
     config.decoder_ratios = json::optional_i64_array(value, "decoder_ratios", config.encoder_ratios);
     config.decoder_depths = json::optional_string(value, "decoder_depths", config.decoder_depths);
-    require_positive(config.channels, label);
-    require_positive(config.vae_dim, label);
-    require_positive(config.encoder_n_filters, label);
-    require_positive(config.decoder_n_filters, label);
+    engine::io::require_positive(config.channels, label);
+    engine::io::require_positive(config.vae_dim, label);
+    engine::io::require_positive(config.encoder_n_filters, label);
+    engine::io::require_positive(config.decoder_n_filters, label);
     if (!config.causal) {
         throw std::runtime_error(std::string("VibeVoice ") + label + " must be causal");
     }
@@ -98,10 +85,10 @@ VibeVoiceTokenizerConfig parse_tokenizer_config(const engine::io::json::Value & 
         config.decoder_ratios = config.encoder_ratios;
     }
     for (const auto ratio : config.encoder_ratios) {
-        require_positive(ratio, label);
+        engine::io::require_positive(ratio, label);
     }
     for (const auto ratio : config.decoder_ratios) {
-        require_positive(ratio, label);
+        engine::io::require_positive(ratio, label);
     }
     require_string_value(config.mixer_layer, "depthwise_conv", label);
     require_string_value(config.conv_norm, "none", label);
@@ -126,15 +113,15 @@ VibeVoiceDecoderConfig parse_decoder_config(const engine::io::json::Value & valu
     config.tie_word_embeddings = json::optional_bool(value, "tie_word_embeddings", config.tie_word_embeddings);
     config.use_cache = json::optional_bool(value, "use_cache", config.use_cache);
     config.use_sliding_window = json::optional_bool(value, "use_sliding_window", config.use_sliding_window);
-    require_positive(config.hidden_size, "decoder hidden_size");
-    require_positive(config.intermediate_size, "decoder intermediate_size");
-    require_positive(config.max_position_embeddings, "decoder max_position_embeddings");
-    require_positive(config.num_attention_heads, "decoder num_attention_heads");
-    require_positive(config.num_hidden_layers, "decoder num_hidden_layers");
-    require_positive(config.num_key_value_heads, "decoder num_key_value_heads");
-    require_positive(config.vocab_size, "decoder vocab_size");
-    require_divisible(config.hidden_size, config.num_attention_heads, "decoder hidden_size / heads");
-    require_divisible(config.num_attention_heads, config.num_key_value_heads, "decoder grouped query heads");
+    engine::io::require_positive(config.hidden_size, "decoder hidden_size");
+    engine::io::require_positive(config.intermediate_size, "decoder intermediate_size");
+    engine::io::require_positive(config.max_position_embeddings, "decoder max_position_embeddings");
+    engine::io::require_positive(config.num_attention_heads, "decoder num_attention_heads");
+    engine::io::require_positive(config.num_hidden_layers, "decoder num_hidden_layers");
+    engine::io::require_positive(config.num_key_value_heads, "decoder num_key_value_heads");
+    engine::io::require_positive(config.vocab_size, "decoder vocab_size");
+    engine::io::require_divisible(config.hidden_size, config.num_attention_heads, "decoder hidden_size / heads");
+    engine::io::require_divisible(config.num_attention_heads, config.num_key_value_heads, "decoder grouped query heads");
     config.head_dim = config.hidden_size / config.num_attention_heads;
     if (config.use_sliding_window) {
         throw std::runtime_error("VibeVoice decoder sliding-window attention is not expected for 1.5B");
@@ -157,13 +144,13 @@ VibeVoiceDiffusionHeadConfig parse_diffusion_head_config(const engine::io::json:
     config.prediction_type = json::optional_string(value, "prediction_type", config.prediction_type);
     config.rms_norm_eps = json::optional_f32(value, "rms_norm_eps", config.rms_norm_eps);
     config.speech_vae_dim = json::optional_i64(value, "speech_vae_dim", config.latent_size);
-    require_positive(config.ddpm_batch_mul, "diffusion ddpm_batch_mul");
-    require_positive(config.ddpm_num_inference_steps, "diffusion ddpm_num_inference_steps");
-    require_positive(config.ddpm_num_steps, "diffusion ddpm_num_steps");
-    require_positive(config.head_layers, "diffusion head_layers");
-    require_positive(config.hidden_size, "diffusion hidden_size");
-    require_positive(config.latent_size, "diffusion latent_size");
-    require_positive(config.speech_vae_dim, "diffusion speech_vae_dim");
+    engine::io::require_positive(config.ddpm_batch_mul, "diffusion ddpm_batch_mul");
+    engine::io::require_positive(config.ddpm_num_inference_steps, "diffusion ddpm_num_inference_steps");
+    engine::io::require_positive(config.ddpm_num_steps, "diffusion ddpm_num_steps");
+    engine::io::require_positive(config.head_layers, "diffusion head_layers");
+    engine::io::require_positive(config.hidden_size, "diffusion hidden_size");
+    engine::io::require_positive(config.latent_size, "diffusion latent_size");
+    engine::io::require_positive(config.speech_vae_dim, "diffusion speech_vae_dim");
     require_string_value(config.diffusion_type, "ddpm", "diffusion_type");
     require_string_value(config.prediction_type, "v_prediction", "diffusion prediction_type");
     require_string_value(config.ddpm_beta_schedule, "cosine", "diffusion beta schedule");
@@ -198,8 +185,8 @@ VibeVoiceConfig parse_config(const assets::ResourceBundle & resources) {
     config.decoder.tie_word_embeddings =
         json::optional_bool(root, "tie_word_embeddings", config.decoder.tie_word_embeddings);
     config.diffusion_head = parse_diffusion_head_config(root.require("diffusion_head_config"));
-    require_positive(config.acoustic_vae_dim, "acoustic_vae_dim");
-    require_positive(config.semantic_vae_dim, "semantic_vae_dim");
+    engine::io::require_positive(config.acoustic_vae_dim, "acoustic_vae_dim");
+    engine::io::require_positive(config.semantic_vae_dim, "semantic_vae_dim");
     if (config.acoustic_vae_dim != config.acoustic_tokenizer.vae_dim) {
         throw std::runtime_error("VibeVoice acoustic_vae_dim does not match acoustic tokenizer vae_dim");
     }
@@ -232,162 +219,17 @@ VibeVoiceProcessorConfig parse_processor_config(const assets::ResourceBundle & r
             json::optional_f32(*audio, "target_dB_FS", config.audio_processor.target_db_fs);
         config.audio_processor.eps = json::optional_f32(*audio, "eps", config.audio_processor.eps);
     }
-    require_positive(config.speech_tok_compress_ratio, "processor speech_tok_compress_ratio");
-    require_positive(config.audio_processor.sample_rate, "processor sampling_rate");
+    engine::io::require_positive(config.speech_tok_compress_ratio, "processor speech_tok_compress_ratio");
+    engine::io::require_positive(config.audio_processor.sample_rate, "processor sampling_rate");
     if (config.language_model_pretrained_name.empty()) {
         throw std::runtime_error("VibeVoice processor language_model_pretrained_name must not be empty");
     }
     return config;
 }
 
-class ShardedTensorSource final : public assets::TensorSource {
-public:
-    ShardedTensorSource(
-        std::filesystem::path index_path,
-        std::unordered_map<std::string, std::string> weight_map,
-        std::unordered_map<std::string, std::shared_ptr<const assets::TensorSource>> shard_sources)
-        : index_path_(std::move(index_path)),
-          weight_map_(std::move(weight_map)),
-          shard_sources_(std::move(shard_sources)) {}
-
-    const std::filesystem::path & source_path() const noexcept override {
-        return index_path_;
-    }
-
-    bool has_tensor(std::string_view name) const noexcept override {
-        const auto route = weight_map_.find(std::string(name));
-        if (route == weight_map_.end()) {
-            return false;
-        }
-        const auto source = shard_sources_.find(route->second);
-        return source != shard_sources_.end() && source->second->has_tensor(name);
-    }
-
-    assets::TensorMetadata require_metadata(std::string_view name) const override {
-        return source_for(name)->require_metadata(name);
-    }
-
-    std::vector<assets::TensorMetadata> tensors() const override {
-        std::vector<assets::TensorMetadata> out;
-        out.reserve(weight_map_.size());
-        for (const auto & [name, _] : weight_map_) {
-            out.push_back(require_metadata(name));
-        }
-        std::sort(out.begin(), out.end(), [](const auto & lhs, const auto & rhs) {
-            return lhs.name < rhs.name;
-        });
-        return out;
-    }
-
-    void release_storage() const override {
-        for (const auto & [_, source] : shard_sources_) {
-            source->release_storage();
-        }
-    }
-
-    assets::RawTensorData require_tensor_data(std::string_view name) const override {
-        return source_for(name)->require_tensor_data(name);
-    }
-
-    std::vector<float> require_f32(
-        std::string_view name,
-        const std::optional<std::vector<int64_t>> & expected_shape) const override {
-        return source_for(name)->require_f32(name, expected_shape);
-    }
-
-    std::optional<std::vector<float>> optional_f32(
-        std::string_view name,
-        const std::optional<std::vector<int64_t>> & expected_shape) const override {
-        if (!has_tensor(name)) {
-            return std::nullopt;
-        }
-        return require_f32(name, expected_shape);
-    }
-
-    void set_backend_tensor(
-        ggml_tensor * tensor,
-        std::string_view name,
-        assets::TensorStorageType storage_type,
-        const std::vector<int64_t> & expected_shape) const override {
-        source_for(name)->set_backend_tensor(tensor, name, storage_type, expected_shape);
-    }
-
-    void set_backend_f32_tensor(
-        ggml_tensor * tensor,
-        std::string_view name,
-        const std::vector<int64_t> & expected_shape) const override {
-        source_for(name)->set_backend_f32_tensor(tensor, name, expected_shape);
-    }
-
-    int64_t require_i64_scalar(std::string_view name) const override {
-        return source_for(name)->require_i64_scalar(name);
-    }
-
-private:
-    std::shared_ptr<const assets::TensorSource> source_for(std::string_view name) const {
-        const auto route = weight_map_.find(std::string(name));
-        if (route == weight_map_.end()) {
-            throw std::runtime_error("missing VibeVoice tensor route: " + std::string(name));
-        }
-        const auto source = shard_sources_.find(route->second);
-        if (source == shard_sources_.end()) {
-            throw std::runtime_error("missing VibeVoice tensor shard source: " + route->second);
-        }
-        return source->second;
-    }
-
-    std::filesystem::path index_path_;
-    std::unordered_map<std::string, std::string> weight_map_;
-    std::unordered_map<std::string, std::shared_ptr<const assets::TensorSource>> shard_sources_;
-};
-
-std::unordered_map<std::string, std::string> parse_weight_map(const engine::io::json::Value & index_root) {
-    const auto & weight_map_object = index_root.require("weight_map").as_object();
-    std::unordered_map<std::string, std::string> weight_map;
-    weight_map.reserve(weight_map_object.size());
-    for (const auto & [name, value] : weight_map_object) {
-        weight_map.emplace(name, value.as_string());
-    }
-    if (weight_map.empty()) {
-        throw std::runtime_error("VibeVoice safetensors index has an empty weight_map");
-    }
-    return weight_map;
-}
-
-std::vector<std::filesystem::path> shard_paths_from_weight_map(
-    const std::filesystem::path & model_root,
-    const std::unordered_map<std::string, std::string> & weight_map) {
-    std::set<std::string> names;
-    for (const auto & [_, file_name] : weight_map) {
-        names.insert(file_name);
-    }
-    std::vector<std::filesystem::path> paths;
-    paths.reserve(names.size());
-    for (const auto & name : names) {
-        const auto path = model_root / name;
-        if (!engine::io::is_existing_file(path)) {
-            throw std::runtime_error("missing VibeVoice safetensors shard: " + path.string());
-        }
-        paths.push_back(std::filesystem::weakly_canonical(path));
-    }
-    return paths;
-}
-
-std::shared_ptr<const assets::TensorSource> open_sharded_tensor_source(
-    const std::filesystem::path & index_path,
-    const std::filesystem::path & model_root,
-    const std::unordered_map<std::string, std::string> & weight_map) {
-    std::unordered_map<std::string, std::shared_ptr<const assets::TensorSource>> shard_sources;
-    for (const auto & path : shard_paths_from_weight_map(model_root, weight_map)) {
-        shard_sources.emplace(path.filename().string(), assets::open_tensor_source(path));
-    }
-    return std::make_shared<ShardedTensorSource>(index_path, weight_map, std::move(shard_sources));
-}
-
 void fill_paths(
     VibeVoiceAssetPaths & paths,
-    const assets::ResourceBundle & resources,
-    const std::unordered_map<std::string, std::string> & weight_map) {
+    const assets::ResourceBundle & resources) {
     paths.model_root = resources.model_root();
     paths.config_path = resources.require_file("config");
     paths.model_index_path = resources.require_file("model_index");
@@ -404,86 +246,69 @@ void fill_paths(
     if (const auto * path = resources.find_file("tokenizer_merges"); path != nullptr) {
         paths.tokenizer_merges_path = *path;
     }
-    paths.model_shard_paths = shard_paths_from_weight_map(paths.model_root, weight_map);
-}
-
-void require_tensor_metadata(
-    const assets::TensorSource & source,
-    const std::string & name,
-    std::initializer_list<int64_t> expected_shape) {
-    const auto metadata = source.require_metadata(name);
-    if (metadata.shape != std::vector<int64_t>(expected_shape)) {
-        throw std::runtime_error("VibeVoice tensor shape mismatch for " + name);
-    }
-}
-
-void require_scalar_tensor(const assets::TensorSource & source, const std::string & name) {
-    const auto metadata = source.require_metadata(name);
-    if (!metadata.shape.empty()) {
-        throw std::runtime_error("VibeVoice tensor must be scalar: " + name);
-    }
+    paths.model_shard_paths = engine::assets::indexed_tensor_source_shard_paths(
+        paths.model_index_path,
+        paths.model_root);
 }
 
 void validate_weight_anchors(const VibeVoiceAssets & assets) {
     const auto & config = assets.config;
     const auto & weights = *assets.model_weights;
     const auto & decoder = config.decoder;
-    require_tensor_metadata(weights, "model.language_model.embed_tokens.weight", {decoder.vocab_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.language_model.embed_tokens.weight", {decoder.vocab_size, decoder.hidden_size});
     if (!decoder.tie_word_embeddings) {
         const auto lm_head_name = weights.require_tensor_name({"lm_head.weight", "model.lm_head.weight"});
-        require_tensor_metadata(weights, lm_head_name, {decoder.vocab_size, decoder.hidden_size});
+        assets::require_tensor_shape(weights, lm_head_name, {decoder.vocab_size, decoder.hidden_size});
     }
-    require_tensor_metadata(weights, "model.language_model.norm.weight", {decoder.hidden_size});
-    require_tensor_metadata(weights, "model.language_model.layers.0.self_attn.q_proj.weight", {decoder.hidden_size, decoder.hidden_size});
-    require_tensor_metadata(
+    assets::require_tensor_shape(weights, "model.language_model.norm.weight", {decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.language_model.layers.0.self_attn.q_proj.weight", {decoder.hidden_size, decoder.hidden_size});
+    assets::require_tensor_shape(
         weights,
         "model.language_model.layers.0.self_attn.k_proj.weight",
         {decoder.num_key_value_heads * decoder.head_dim, decoder.hidden_size});
-    require_tensor_metadata(
+    assets::require_tensor_shape(
         weights,
         "model.language_model.layers.0.self_attn.v_proj.weight",
         {decoder.num_key_value_heads * decoder.head_dim, decoder.hidden_size});
-    require_tensor_metadata(weights, "model.language_model.layers.0.self_attn.o_proj.weight", {decoder.hidden_size, decoder.hidden_size});
-    require_tensor_metadata(weights, "model.language_model.layers.0.mlp.gate_proj.weight", {decoder.intermediate_size, decoder.hidden_size});
-    require_tensor_metadata(weights, "model.language_model.layers.0.mlp.up_proj.weight", {decoder.intermediate_size, decoder.hidden_size});
-    require_tensor_metadata(weights, "model.language_model.layers.0.mlp.down_proj.weight", {decoder.hidden_size, decoder.intermediate_size});
+    assets::require_tensor_shape(weights, "model.language_model.layers.0.self_attn.o_proj.weight", {decoder.hidden_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.language_model.layers.0.mlp.gate_proj.weight", {decoder.intermediate_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.language_model.layers.0.mlp.up_proj.weight", {decoder.intermediate_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.language_model.layers.0.mlp.down_proj.weight", {decoder.hidden_size, decoder.intermediate_size});
 
-    require_tensor_metadata(weights, "model.acoustic_connector.fc1.weight", {decoder.hidden_size, config.acoustic_vae_dim});
-    require_tensor_metadata(weights, "model.acoustic_connector.norm.weight", {decoder.hidden_size});
-    require_tensor_metadata(weights, "model.acoustic_connector.fc2.weight", {decoder.hidden_size, decoder.hidden_size});
-    require_tensor_metadata(weights, "model.semantic_connector.fc1.weight", {decoder.hidden_size, config.semantic_vae_dim});
-    require_tensor_metadata(weights, "model.semantic_connector.norm.weight", {decoder.hidden_size});
-    require_tensor_metadata(weights, "model.semantic_connector.fc2.weight", {decoder.hidden_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.acoustic_connector.fc1.weight", {decoder.hidden_size, config.acoustic_vae_dim});
+    assets::require_tensor_shape(weights, "model.acoustic_connector.norm.weight", {decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.acoustic_connector.fc2.weight", {decoder.hidden_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.semantic_connector.fc1.weight", {decoder.hidden_size, config.semantic_vae_dim});
+    assets::require_tensor_shape(weights, "model.semantic_connector.norm.weight", {decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.semantic_connector.fc2.weight", {decoder.hidden_size, decoder.hidden_size});
 
-    require_tensor_metadata(
+    assets::require_tensor_shape(
         weights,
         "model.prediction_head.noisy_images_proj.weight",
         {config.diffusion_head.hidden_size, config.diffusion_head.latent_size});
-    require_tensor_metadata(weights, "model.prediction_head.cond_proj.weight", {decoder.hidden_size, decoder.hidden_size});
-    require_tensor_metadata(weights, "model.prediction_head.t_embedder.mlp.0.weight", {decoder.hidden_size, 256});
-    require_tensor_metadata(
+    assets::require_tensor_shape(weights, "model.prediction_head.cond_proj.weight", {decoder.hidden_size, decoder.hidden_size});
+    assets::require_tensor_shape(weights, "model.prediction_head.t_embedder.mlp.0.weight", {decoder.hidden_size, 256});
+    assets::require_tensor_shape(
         weights,
         "model.prediction_head.layers.0.ffn.gate_proj.weight",
         {static_cast<int64_t>(decoder.hidden_size * config.diffusion_head.head_ffn_ratio), decoder.hidden_size});
-    require_tensor_metadata(
+    assets::require_tensor_shape(
         weights,
         "model.prediction_head.final_layer.linear.weight",
         {config.diffusion_head.latent_size, decoder.hidden_size});
 
-    require_tensor_metadata(
+    assets::require_tensor_shape(
         weights,
         "model.acoustic_tokenizer.encoder.downsample_layers.0.0.conv.conv.weight",
         {config.acoustic_tokenizer.encoder_n_filters, config.acoustic_tokenizer.channels, 7});
-    require_tensor_metadata(
+    assets::require_tensor_shape(
         weights,
         "model.acoustic_tokenizer.decoder.head.conv.conv.weight",
         {config.acoustic_tokenizer.channels, config.acoustic_tokenizer.decoder_n_filters, 7});
-    require_tensor_metadata(
+    assets::require_tensor_shape(
         weights,
         "model.semantic_tokenizer.encoder.downsample_layers.0.0.conv.conv.weight",
         {config.semantic_tokenizer.encoder_n_filters, config.semantic_tokenizer.channels, 7});
-    require_scalar_tensor(weights, "model.speech_scaling_factor");
-    require_scalar_tensor(weights, "model.speech_bias_factor");
 }
 
 float require_scalar_f32(const assets::TensorSource & source, const std::string & name) {
@@ -523,22 +348,20 @@ float require_scalar_f32(const assets::TensorSource & source, const std::string 
 
 VibeVoiceAssetPaths resolve_vibevoice_assets(const std::filesystem::path & model_path) {
     auto resources = make_resource_bundle(model_path);
-    const auto index_root = resources.parse_json("model_index");
-    const auto weight_map = parse_weight_map(index_root);
     VibeVoiceAssetPaths paths;
-    fill_paths(paths, resources, weight_map);
+    fill_paths(paths, resources);
     return paths;
 }
 
 std::shared_ptr<const VibeVoiceAssets> load_vibevoice_assets(const std::filesystem::path & model_path) {
     auto resources = make_resource_bundle(model_path);
-    const auto index_root = resources.parse_json("model_index");
-    const auto weight_map = parse_weight_map(index_root);
     VibeVoiceAssets assets;
-    fill_paths(assets.paths, resources, weight_map);
+    fill_paths(assets.paths, resources);
     assets.config = parse_config(resources);
     assets.processor = parse_processor_config(resources);
-    assets.model_weights = open_sharded_tensor_source(assets.paths.model_index_path, assets.paths.model_root, weight_map);
+    assets.model_weights = engine::assets::open_indexed_tensor_source(
+        assets.paths.model_index_path,
+        assets.paths.model_root);
     validate_weight_anchors(assets);
     assets.speech_scaling_factor = require_scalar_f32(*assets.model_weights, "model.speech_scaling_factor");
     assets.speech_bias_factor = require_scalar_f32(*assets.model_weights, "model.speech_bias_factor");
