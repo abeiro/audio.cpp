@@ -14,6 +14,8 @@
 namespace engine::models::pocket_tts {
 namespace {
 
+constexpr size_t kPromptGraphNodeCapacity = 262144;
+
 modules::TransformerEncoderBlockWeights make_transformer_layer_weights(
     core::ModuleBuildContext & ctx,
     const models::pocket_tts::PocketTTSBackendWeights & weights,
@@ -383,7 +385,8 @@ public:
         core::write_tensor_f32(attention_mask_, attention_mask_buffer_);
         core::set_backend_threads(backend_, threads_);
         if (prompt_steps_ > 0) {
-            prompt_graph_ = ggml_new_graph_custom(ggml_ctx_, 32768, false);
+            // Long or dense prompts add per-step KV transfer nodes beyond the default graph capacity.
+            prompt_graph_ = ggml_new_graph_custom(ggml_ctx_, kPromptGraphNodeCapacity, false);
             ggml_build_forward_expand(prompt_graph_, prompt_output_.tensor);
             for (size_t step = 0; step < prompt_step_key_sources_.size(); ++step) {
                 for (size_t layer = 0; layer < prompt_step_key_sources_[step].size(); ++layer) {
