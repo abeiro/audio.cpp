@@ -18,7 +18,7 @@ interface PackageSpec {
   family: string;
   packages?: Array<Omit<PackageEntry, 'family'>>;
   options?: {
-    request?: Array<{ name: string }>;
+    request?: Array<{ name: string; required?: boolean }>;
   };
   ui?: {
     builtin_voices?: string[];
@@ -71,6 +71,7 @@ function preferredPackage(entries: PackageEntry[]): PackageEntry | undefined {
 function relatedPackages(entry: CatalogEntry): PackageEntry[] {
   const family = packages.filter((candidate) => candidate.family === entry.family);
   if (!family.length) return [];
+  if (entry.family === 'ace_step') return family;
   if (!entry.download_id) return family;
   const exact = family.find((candidate) => candidate.id === entry.download_id);
   if (exact) {
@@ -104,6 +105,17 @@ function relatedPackages(entry: CatalogEntry): PackageEntry[] {
 }
 
 function packageLabel(entry: PackageEntry): string {
+  if (entry.family === 'ace_step') {
+    const precision = entry.precision === 'bf16'
+      ? 'BF16'
+      : ['q8_0', 'q8'].includes(entry.precision)
+        ? 'Q8'
+        : entry.precision.toUpperCase();
+    if (entry.id.includes('_xl_turbo_')) return `GGUF Turbo XL ${precision}`;
+    if (entry.id.includes('_xl_sft_')) return `GGUF Turbo XL SFT ${precision}`;
+    if (entry.id.includes('_turbo_')) return `GGUF Turbo ${precision}`;
+    return `GGUF ${precision}`;
+  }
   if (entry.format === 'safetensors') return 'Safetensors';
   if (entry.id.includes('int8_dit')) return 'GGUF Q4 ConvRot';
   if (entry.precision === 'q4_k' || entry.precision === 'q4_0') return 'GGUF Q4';
@@ -118,6 +130,8 @@ function packageModelPath(entry: PackageEntry): string {
   if (entry.format === 'gguf' && entry.family === 'minimax_h3') {
     const entryName = entry.id.includes('int8_dit') ? 'dit_int8.gguf' : 'dit.gguf';
     modelFile = entry.files?.find((file) => file.toLowerCase().endsWith(`/${entryName}`));
+  } else if (entry.format === 'gguf' && entry.family === 'minimax_music3') {
+    return `models/${entry.target_directory}`;
   } else if (entry.format === 'gguf') {
     modelFile = entry.files?.find((file) => file.toLowerCase().endsWith('.gguf'));
   }
@@ -132,6 +146,17 @@ function packageModelPath(entry: PackageEntry): string {
 
 function installChoices(entry: CatalogEntry): InstallPackageChoice[] {
   const related = relatedPackages(entry);
+  if (entry.family === 'ace_step') {
+    return related
+      .filter((candidate) => candidate.format === 'gguf')
+      .map((candidate) => ({
+        id: candidate.id,
+        label: packageLabel(candidate),
+        path: packageModelPath(candidate),
+        format: candidate.format,
+        precision: candidate.precision
+      }));
+  }
   const q8 = preferredPackage(related.filter((candidate) =>
     candidate.format === 'gguf' && ['q8_0', 'q8'].includes(candidate.precision)));
   const fp16 = preferredPackage(related.filter((candidate) =>
@@ -173,6 +198,9 @@ export const catalog = (rawCatalog.models as CatalogEntry[]).flatMap((entry) => 
     install_packages: choices,
     path: installPackage?.path || entry.path,
     request_options: spec?.options?.request?.map((option) => option.name),
+    required_request_options: spec?.options?.request
+      ?.filter((option) => option.required === true)
+      .map((option) => option.name),
     builtin_voices: spec?.ui?.builtin_voices,
     default_voice: spec?.ui?.default_voice
   }];

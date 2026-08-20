@@ -61,16 +61,17 @@ void print_help() {
     std::cout
         << "audiocpp_server [--config <server.json>] [--ui] [--host <ip>] [--port <port>] [--backend <backend>]\n"
         << "                [--device <id>] [--threads <n>] [--busy-timeout-ms <ms>]\n"
-        << "                [--model-spec-override <json-or-directory>]\n"
+        << "                [--model-spec-override <json-or-directory>] [--voice-dir <directory>]\n"
         << "                [--log] [--log-file <path>]\n"
         << "                [--cors-origins <origins>]\n"
-        << "  --ui                             serve the embedded WebUI; without --config, start\n"
-        << "                                   as a native model-management host\n"
+        << "  --ui                             serve the embedded WebUI\n"
         << "  --no-ui                          disable the embedded WebUI\n"
-        << "  --ui-management                  allow WebUI model load/unload and temporary uploads\n"
+        << "  --ui-management                  allow WebUI model management and downloads; requires\n"
+        << "                                   AUDIOCPP_BUILD_NATIVE_MODEL_MANAGER=ON at build time\n"
         << "  --backend cpu|cuda|hip|rocm|vulkan|metal  default cuda (rocm is an alias for hip)\n"
         << "  --busy-timeout-ms <ms>           fail a request with 503 when the model has been\n"
         << "                                   busy this long; default 300000, 0 disables\n"
+        << "  --voice-dir <directory>          override the shared reference voice library directory\n"
         << "  --cors-origins \"*\"              experimental; disabled by default. Allows browser\n"
         << "                                   requests from any origin for trusted local demos only\n"
         << "\n"
@@ -80,7 +81,7 @@ void print_help() {
         << "  GET  /v1/models\n"
         << "  POST /v1/models/load             available with --ui-management\n"
         << "  POST /v1/models/unload           available with --ui-management\n"
-        << "  POST /v1/ui/upload               available with --ui-management\n"
+        << "  POST /v1/ui/upload               temporary browser upload for WebUI requests\n"
         << "  POST /v1/ui/models/install       background package download/preparation\n"
         << "  POST /v1/ui/models/install/stop  stop one active package download\n"
         << "  POST /v1/ui/models/clean-partial remove abandoned package staging files\n"
@@ -92,7 +93,10 @@ void print_help() {
         << "  GET  /v1/ui/models/package-sizes package sizes from metadata-only checks\n"
         << "  GET  /v1/audio/voices?model=<id>\n"
         << "  POST /v1/audio/speech\n"
+        << "  POST /v1/audio/speech/live?model=<id>\n"
+        << "       raw PCM in a chunked body, speech audio deltas as SSE on the same connection\n"
         << "  POST /v1/audio/transcriptions\n"
+        << "       fields: file, model, language, prompt, stream\n"
         << "       OpenAI-style streaming: speech stream_format=sse|audio, transcription stream=true\n"
         << "  POST /v1/audio/transcriptions/live?model=<id>\n"
         << "       raw PCM in a chunked body, transcript deltas as SSE on the same connection\n"
@@ -132,7 +136,6 @@ int main(int argc, char ** argv) {
             ? minitts::server::load_server_config(*config_path)
             : minitts::server::ServerConfig{};
         if (!config_path.has_value()) {
-            config.ui_management = true;
             config.lazy_load = true;
         }
         if (ui_requested) {
@@ -144,6 +147,13 @@ int main(int argc, char ** argv) {
         if (has_arg(argc, argv, "--ui-management")) {
             config.ui_management = true;
         }
+#if !defined(AUDIOCPP_HAS_NATIVE_MODEL_MANAGER)
+        if (config.ui_management) {
+            throw std::runtime_error(
+                "UI model management is not available in this build; reconfigure with "
+                "-DAUDIOCPP_BUILD_NATIVE_MODEL_MANAGER=ON");
+        }
+#endif
         if (const auto host = arg_value(argc, argv, "--host")) {
             config.host = *host;
         }
@@ -167,6 +177,9 @@ int main(int argc, char ** argv) {
         }
         if (const auto model_spec = arg_value(argc, argv, "--model-spec-override")) {
             config.model_spec_override = std::filesystem::path(*model_spec);
+        }
+        if (const auto voice_dir = arg_value(argc, argv, "--voice-dir")) {
+            config.voice_dir = std::filesystem::path(*voice_dir);
         }
         if (!(config.cors_origins == "*" || config.cors_origins == "")) {
             throw std::runtime_error("--cors-origins must be '*' (allow all origins) or '' (disabled)");
